@@ -310,7 +310,7 @@ export function createMcpServerInstance(
       "1. Exact Symbols Win (Highest Precision): Query exact API names, functions, hooks, types, or interfaces (e.g. 'useEffect', 'tabs.onUpdated', 'createSlice').\n" +
       "2. Keep It Short: Use 1-3 targeted keywords only. Do NOT stack 5+ words or write full sentences.\n" +
       "3. No Boolean Operators: Do NOT use 'or', 'and', 'how to' — search keywords directly.\n" +
-      "4. Next Step: Search returns concise content snippets. To read the complete guide, full API contract, or code examples, take the resulting URL and call `read_page`.\n" +
+      "4. Next Step (Avoid Chunks): Results often return multiple partial chunks from the same URL. Do NOT piece them together — simply take the resulting URL and call `read_page` ONCE to read the entire page, full API contract, and code examples.\n" +
       "5. Fallback: If unsure about available topics or search returns empty, call `list_pages` to browse the sitemap.",
     {
       library: z
@@ -449,8 +449,13 @@ ${r.content}\n`,
   // List pages tool
   server.tool(
     "list_pages",
-    "List indexed documentation pages and sitemap for a library version with pagination.\n" +
-      "Call this when exploring a library's architecture, when you do not know exact function names, or when `search_docs` returns no relevant results.",
+    "List indexed documentation pages and sitemap for a library version with pagination.\n\n" +
+      "WHEN TO USE:\n" +
+      "1. Architectural Overview: Discover how a library is structured or browse available modules.\n" +
+      "2. Keyword Fallback: Use when you do not know the exact symbol name or when `search_docs` yields no results.\n\n" +
+      "BEST PRACTICES:\n" +
+      "- Targeted Exploration: Use `prefix` to narrow down to a specific subpath (e.g. '/api/tabs' or '/docs/components') instead of paginating through hundreds of pages.\n" +
+      "- Next Step: Pick the most relevant page URL from the output and call `read_page` to inspect full documentation.",
     {
       library: z
         .string()
@@ -466,7 +471,7 @@ ${r.content}\n`,
         .trim()
         .optional()
         .describe(
-          "Filter page URLs starting with or containing this prefix (e.g. '/docs/components').",
+          "Filter page URLs starting with or containing this prefix (e.g. '/docs/components' or '/api').",
         ),
       limit: z
         .number()
