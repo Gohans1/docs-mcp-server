@@ -20,29 +20,36 @@ describe("ListPagesTool", () => {
     await expect(tool.execute({ library: "   " })).rejects.toThrow(ValidationError);
   });
 
-  it("should enforce limit constraints and clamp between 1 and 200", async () => {
+  it("should enforce limit constraints, defaulting non-positive limits to 200 and clamping max to 200", async () => {
     const mockResult = {
       library: "react",
       version: "19.0.0",
       total: 1,
       pages: [{ url: "https://react.dev/start", title: "Quickstart", depth: 1 }],
-      limit: 50,
+      limit: 200,
       offset: 0,
       hasMore: false,
     };
     (mockDocService.listPages as ReturnType<typeof vi.fn>).mockResolvedValue(mockResult);
 
     await tool.execute({ library: "react", limit: 500 });
-    expect(mockDocService.listPages).toHaveBeenCalledWith("react", undefined, {
+    expect(mockDocService.listPages).toHaveBeenNthCalledWith(1, "react", undefined, {
       prefix: undefined,
       limit: 200,
       offset: 0,
     });
 
     await tool.execute({ library: "react", limit: -10 });
-    expect(mockDocService.listPages).toHaveBeenCalledWith("react", undefined, {
+    expect(mockDocService.listPages).toHaveBeenNthCalledWith(2, "react", undefined, {
       prefix: undefined,
-      limit: 50,
+      limit: 200,
+      offset: 0,
+    });
+
+    await tool.execute({ library: "react" });
+    expect(mockDocService.listPages).toHaveBeenNthCalledWith(3, "react", undefined, {
+      prefix: undefined,
+      limit: 200,
       offset: 0,
     });
   });

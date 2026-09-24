@@ -222,11 +222,16 @@ describe("DocumentStore - getPageContent and listPages", () => {
     expect(resultTruncated.content.length).toBe(12);
     expect(resultTruncated.truncated).toBe(true);
 
+    // Test listPages with default limit (omitted options)
+    const listDefault = await documentStore.listPages("mylib", "1.0.0");
+    expect(listDefault.limit).toBe(200);
+
     // Test listPages without prefix
     const listAll = await documentStore.listPages("mylib", "1.0.0", {
       limit: 10,
       offset: 0,
     });
+    expect(listAll.limit).toBe(10);
     expect(listAll.total).toBe(4);
     expect(listAll.pages.length).toBe(4);
     expect(listAll.hasMore).toBe(false);

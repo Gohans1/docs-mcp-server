@@ -478,8 +478,8 @@ ${r.content}\n`,
         .positive()
         .max(200)
         .optional()
-        .default(50)
-        .describe("Maximum pages to return (default 50, max 200)."),
+        .default(200)
+        .describe("Maximum pages to return (default 200, max 200)."),
       offset: z
         .number()
         .int()

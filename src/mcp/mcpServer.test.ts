@@ -202,6 +202,14 @@ describe("MCP Server Read-Only Mode", () => {
     );
   });
 
+  it("should describe the supported list_pages default limit of 200", () => {
+    const server = createMcpServerInstance(mockTools, mockConfig);
+    const schema = (server as any)._registeredTools.list_pages.inputSchema;
+
+    expect(schema.shape.limit.description).toContain("default 200");
+    expect(schema.parse({ library: "react" }).limit).toBe(200);
+  });
+
   it("should handle list_pages tool execution and format links with depth", async () => {
     (mockTools.listPages.execute as any).mockResolvedValueOnce({
       library: "react",

@@ -32,9 +32,9 @@ export class ListPagesTool {
       );
     }
 
-    let limit = options.limit ?? 50;
+    let limit = options.limit ?? 200;
     if (!Number.isFinite(limit) || limit <= 0) {
-      limit = 50;
+      limit = 200;
     } else if (limit > 200) {
       limit = 200;
     }

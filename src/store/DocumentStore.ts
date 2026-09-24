@@ -2459,7 +2459,7 @@ export class DocumentStore {
       }
 
       const versionId = versionResult.id;
-      const limit = Math.min(Math.max(1, options.limit ?? 50), 200);
+      const limit = Math.min(Math.max(1, options.limit ?? 200), 200);
       const offset = Math.max(0, options.offset ?? 0);
       const prefix = options.prefix?.trim();
 
