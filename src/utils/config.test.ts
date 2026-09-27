@@ -189,12 +189,14 @@ describe("Configuration Loading", () => {
       expect(config.assembly.maxParentChainDepth).toBe(10);
     });
 
-    it("should apply scraper retry and abort threshold defaults", () => {
+    it("should apply scraper retry, depth, and abort threshold defaults", () => {
       const configPath = path.join(tmpDir, "scraper-defaults.yaml");
       fs.writeFileSync(configPath, "");
 
       const config = loadConfig({ config: configPath });
 
+      expect(config.scraper.maxPages).toBe(1000);
+      expect(config.scraper.maxDepth).toBe(5);
       expect(config.scraper.fetcher.maxRetries).toBe(3);
       expect(config.scraper.abortOnFailureRate).toBe(0.5);
     });

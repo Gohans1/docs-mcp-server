@@ -295,6 +295,9 @@ describe("MCP Server Read-Only Mode", () => {
     expect(scrapeTool.inputSchema.shape.maxPages.description).toBe(
       "Maximum pages to scrape (default: 1000). Set based on site size.",
     );
+    expect(scrapeTool.inputSchema.shape.maxDepth.description).toBe(
+      "Maximum navigation depth (default: 5).",
+    );
 
     const parsed = scrapeTool.inputSchema.parse({
       url: "https://example.com",
