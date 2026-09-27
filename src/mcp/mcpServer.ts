@@ -96,7 +96,7 @@ export function createMcpServerInstance(
     // Scrape docs tool - suppress deep inference issues
     server.tool(
       "scrape_docs",
-      "Scrape and index documentation from a URL for a library. Use this tool to index a new library or a new version.",
+      "Scrape and index documentation for a library. Check the site first to set appropriate maxPages and maxDepth.",
       {
         url: z.string().url().describe("Documentation root URL to scrape."),
         library: z.string().trim().describe("Library name."),
@@ -106,7 +106,7 @@ export function createMcpServerInstance(
           .optional()
           .default(config.scraper.maxPages)
           .describe(
-            `Maximum number of pages to scrape (default: ${config.scraper.maxPages}).`,
+            `Maximum pages to scrape (default: ${config.scraper.maxPages}). Set based on site size.`,
           ),
         maxDepth: z
           .number()

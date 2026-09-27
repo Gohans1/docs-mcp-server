@@ -101,7 +101,7 @@ export const DEFAULT_CONFIG = {
   },
   scraper: {
     maxPages: 1000,
-    maxDepth: 3,
+    maxDepth: 5,
     maxConcurrency: 3,
     abortOnFailureRate: 0.5,
     preserveHashes: false,

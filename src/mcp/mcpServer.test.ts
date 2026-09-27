@@ -281,6 +281,28 @@ describe("MCP Server Read-Only Mode", () => {
     );
   });
 
+  it("should register scrape_docs with site inspection prompt and default maxDepth 5", () => {
+    const configWithMaxDepth5 = {
+      app: { readOnly: false },
+      scraper: { maxPages: 1000, maxDepth: 5 },
+    } as unknown as AppConfig;
+    const server = createMcpServerInstance(mockTools, configWithMaxDepth5);
+    const scrapeTool = (server as any)._registeredTools.scrape_docs;
+
+    expect(scrapeTool.description).toBe(
+      "Scrape and index documentation for a library. Check the site first to set appropriate maxPages and maxDepth.",
+    );
+    expect(scrapeTool.inputSchema.shape.maxPages.description).toBe(
+      "Maximum pages to scrape (default: 1000). Set based on site size.",
+    );
+
+    const parsed = scrapeTool.inputSchema.parse({
+      url: "https://example.com",
+      library: "test-lib",
+    });
+    expect(parsed.maxDepth).toBe(5);
+  });
+
   it("should normalize includePatterns/excludePatterns to string arrays", async () => {
     const server = createMcpServerInstance(mockTools, mockConfig);
     const scrapeTool = (server as any)._registeredTools.scrape_docs;
