@@ -357,6 +357,45 @@ describe("patternMatcher", () => {
         shouldIncludeUrl("docs/test/runner.md", undefined, undefined, githubUrl),
       ).toBe(true);
     });
+
+    it("should exclude root test directories while including docs/test in local repository scrapes", () => {
+      const localRepoUrl = "file:///Users/dev/my-project";
+      // Test fixtures and root test directory in local repo must be excluded
+      expect(
+        shouldIncludeUrl(
+          "file:///Users/dev/my-project/test/helper.ts",
+          undefined,
+          undefined,
+          localRepoUrl,
+        ),
+      ).toBe(false);
+      expect(
+        shouldIncludeUrl(
+          "file:///Users/dev/my-project/tests/fixture.json",
+          undefined,
+          undefined,
+          localRepoUrl,
+        ),
+      ).toBe(false);
+      expect(
+        shouldIncludeUrl(
+          "file:///Users/dev/my-project/packages/core/test/mock.ts",
+          undefined,
+          undefined,
+          localRepoUrl,
+        ),
+      ).toBe(false);
+
+      // But markdown docs under docs/ in a local repo must be included
+      expect(
+        shouldIncludeUrl(
+          "file:///Users/dev/my-project/docs/test/runner.md",
+          undefined,
+          undefined,
+          localRepoUrl,
+        ),
+      ).toBe(true);
+    });
   });
 
   describe("shouldIncludeUrl with default patterns", () => {

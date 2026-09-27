@@ -202,6 +202,25 @@ export function shouldIncludeUrl(
       basename = u.pathname ? u.pathname.split("/").pop() : undefined;
     } catch {}
   }
+
+  // Extract relative path from startUrl when available (supports root-anchored repo patterns e.g. "test/**", "packages/*/test/**")
+  let relativePath: string | undefined;
+  if (startUrl) {
+    try {
+      const startObj = new URL(startUrl);
+      const urlObj = new URL(url);
+      if (startObj.protocol === urlObj.protocol && startObj.host === urlObj.host) {
+        const basePath = startObj.pathname.replace(/\/$/, "");
+        if (urlObj.pathname.startsWith(basePath)) {
+          const rel = urlObj.pathname.slice(basePath.length).replace(/^\//, "");
+          if (rel) {
+            relativePath = rel + (urlObj.search || "");
+          }
+        }
+      }
+    } catch {}
+  }
+
   // Helper to strip leading slash from glob patterns for basename matching (preserves regex patterns)
   const stripSlash = (patterns?: string[]) =>
     patterns?.map((p) => (!isRegexPattern(p) && p.startsWith("/") ? p.slice(1) : p));
@@ -213,18 +232,20 @@ export function shouldIncludeUrl(
   );
 
   // Exclude patterns take precedence
-  // Match against BOTH full URL and pathname for flexibility
+  // Match against full URL, pathname, relativePath, and basename for maximum flexibility
   if (
     matchesAnyPattern(url, effectiveExcludePatterns) ||
     matchesAnyPattern(normalizedPath, effectiveExcludePatterns) ||
+    (relativePath && matchesAnyPattern(relativePath, effectiveExcludePatterns)) ||
     (basename && matchesAnyPattern(basename, stripSlash(effectiveExcludePatterns)))
   )
     return false;
   if (!includePatterns || includePatterns.length === 0) return true;
-  // Match against BOTH full URL and pathname for flexibility
+  // Match against full URL, pathname, relativePath, and basename for maximum flexibility
   return (
     matchesAnyPattern(url, includePatterns) ||
     matchesAnyPattern(normalizedPath, includePatterns) ||
+    (relativePath ? matchesAnyPattern(relativePath, includePatterns) : false) ||
     (basename ? matchesAnyPattern(basename, stripSlash(includePatterns)) : false)
   );
 }
