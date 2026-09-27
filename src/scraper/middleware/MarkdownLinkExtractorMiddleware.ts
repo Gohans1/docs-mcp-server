@@ -31,8 +31,11 @@ export class MarkdownLinkExtractorMiddleware implements ContentProcessorMiddlewa
 
 function stripCodeBlocksAndSpans(content: string): string {
   return content
-    .replace(/(?:^|\n)(?:```|~~~)[^\n]*\n[\s\S]*?\n(?:```|~~~)(?:\n|$)/g, "\n")
-    .replace(/`[^`\n]+`/g, "");
+    .replace(
+      /(?:^|\r?\n)[ \t]{0,3}(?:```|~~~)[^\r\n]*\r?\n[\s\S]*?\r?\n[ \t]{0,3}(?:```|~~~)(?=\r?\n|$)/g,
+      "\n",
+    )
+    .replace(/`[^`\r\n]+`/g, "");
 }
 
 function extractMarkdownLinks(content: string): string[] {
@@ -70,7 +73,7 @@ function addUniqueLink(links: string[], target: string | undefined): void {
   if (cleanTarget.length === 0 || links.includes(cleanTarget)) {
     return;
   }
-  if (/[[\]{}^$]/.test(cleanTarget)) {
+  if (/[[\]{}^]/.test(cleanTarget) || /\$$/.test(cleanTarget)) {
     return;
   }
   links.push(cleanTarget);

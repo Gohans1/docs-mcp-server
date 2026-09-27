@@ -188,6 +188,71 @@ And after the code block:
     expect(context.links).toEqual(["/docs/normal"]);
   });
 
+  it("should not extract links inside fenced code blocks with CRLF line endings", async () => {
+    const middleware = new MarkdownLinkExtractorMiddleware();
+    const crlfContent =
+      "# Guide\r\n\r\nBefore: [Link 1](/docs/link1)\r\n\r\n```yaml\r\nschema: [Fake Link](https://example.com/fake)\r\n```\r\n\r\nAfter: [Link 2](/docs/link2)\r\n";
+    const context = createMockContext(crlfContent);
+    const next = vi.fn().mockResolvedValue(undefined);
+
+    await middleware.process(context, next);
+
+    expect(context.links).toEqual(["/docs/link1", "/docs/link2"]);
+  });
+
+  it("should not extract links inside adjacent fenced code blocks without blank lines", async () => {
+    const middleware = new MarkdownLinkExtractorMiddleware();
+    const adjacentContent = [
+      "```json",
+      '{"status": "ok"}',
+      "```",
+      "```yaml",
+      "schema: [Fake Link](https://example.com/fake-adjacent)",
+      "```",
+      "[Real Link](/docs/real)",
+    ].join("\n");
+    const context = createMockContext(adjacentContent);
+    const next = vi.fn().mockResolvedValue(undefined);
+
+    await middleware.process(context, next);
+
+    expect(context.links).toEqual(["/docs/real"]);
+  });
+
+  it("should not extract links inside tilde fenced code blocks and indented blocks", async () => {
+    const middleware = new MarkdownLinkExtractorMiddleware();
+    const tildeContent = [
+      "   ~~~typescript",
+      "const fake = [Fake](/fake-tilde);",
+      "   ~~~",
+      "[Real Link](/docs/real)",
+    ].join("\n");
+    const context = createMockContext(tildeContent);
+    const next = vi.fn().mockResolvedValue(undefined);
+
+    await middleware.process(context, next);
+
+    expect(context.links).toEqual(["/docs/real"]);
+  });
+
+  it("should allow URLs with $ in query parameters while rejecting regex ending anchors", async () => {
+    const middleware = new MarkdownLinkExtractorMiddleware();
+    const content = [
+      "Valid: [Users API](https://example.com/api/users?$select=id,name)",
+      "Valid 2: [Filter](/api/items?$filter=active%20eq%20true)",
+      "Regex: [Regex Anchor](^[a-z]+$)",
+    ].join("\n");
+    const context = createMockContext(content);
+    const next = vi.fn().mockResolvedValue(undefined);
+
+    await middleware.process(context, next);
+
+    expect(context.links).toEqual([
+      "https://example.com/api/users?$select=id,name",
+      "/api/items?$filter=active%20eq%20true",
+    ]);
+  });
+
   it("should always call the next middleware", async () => {
     const middleware = new MarkdownLinkExtractorMiddleware();
     // Test with null links to ensure it's handled properly
