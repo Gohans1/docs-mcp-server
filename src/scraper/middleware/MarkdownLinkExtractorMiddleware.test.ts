@@ -142,6 +142,52 @@ Again [API][api].
     ]);
   });
 
+  it("should not extract links inside fenced code blocks", async () => {
+    const middleware = new MarkdownLinkExtractorMiddleware();
+    const context = createMockContext(`
+Here is some valid documentation:
+[Valid Guide](/docs/guide)
+
+\`\`\`yaml
+pattern: >-
+  ^[a-z0-9*]([a-z0-9*-]{0,61}[a-z0-9*])?(.[a-z0-9*]([a-z0-9*-]{0,61}[a-z0-9*])?)*$
+schema: [Fake Link](https://example.com/fake-in-code)
+\`\`\`
+
+And after the code block:
+[Another Valid](/docs/valid)
+`);
+    const next = vi.fn().mockResolvedValue(undefined);
+
+    await middleware.process(context, next);
+
+    expect(context.links).toEqual(["/docs/guide", "/docs/valid"]);
+  });
+
+  it("should not extract links inside inline code spans", async () => {
+    const middleware = new MarkdownLinkExtractorMiddleware();
+    const context = createMockContext(
+      "Check `[not a link](/fake)` and also [real link](/real).",
+    );
+    const next = vi.fn().mockResolvedValue(undefined);
+
+    await middleware.process(context, next);
+
+    expect(context.links).toEqual(["/real"]);
+  });
+
+  it("should ignore targets with unencoded bracket or regex characters", async () => {
+    const middleware = new MarkdownLinkExtractorMiddleware();
+    const context = createMockContext(
+      "Pattern: [a-z0-9*]([a-z0-9*-]{0,61}[a-z0-9*]) and [Normal](/docs/normal)",
+    );
+    const next = vi.fn().mockResolvedValue(undefined);
+
+    await middleware.process(context, next);
+
+    expect(context.links).toEqual(["/docs/normal"]);
+  });
+
   it("should always call the next middleware", async () => {
     const middleware = new MarkdownLinkExtractorMiddleware();
     // Test with null links to ensure it's handled properly

@@ -29,11 +29,18 @@ export class MarkdownLinkExtractorMiddleware implements ContentProcessorMiddlewa
   }
 }
 
+function stripCodeBlocksAndSpans(content: string): string {
+  return content
+    .replace(/(?:^|\n)(?:```|~~~)[^\n]*\n[\s\S]*?\n(?:```|~~~)(?:\n|$)/g, "\n")
+    .replace(/`[^`\n]+`/g, "");
+}
+
 function extractMarkdownLinks(content: string): string[] {
   const links: string[] = [];
   const referenceDefinitions = new Map<string, string>();
+  const sanitizedContent = stripCodeBlocksAndSpans(content);
 
-  for (const match of content.matchAll(referenceDefinitionPattern)) {
+  for (const match of sanitizedContent.matchAll(referenceDefinitionPattern)) {
     const label = normalizeReferenceLabel(match[1]);
     const target = cleanReferenceTarget(match[2]);
     if (label && target && !referenceDefinitions.has(label)) {
@@ -41,11 +48,11 @@ function extractMarkdownLinks(content: string): string[] {
     }
   }
 
-  for (const match of content.matchAll(inlineLinkPattern)) {
+  for (const match of sanitizedContent.matchAll(inlineLinkPattern)) {
     addUniqueLink(links, match[2]);
   }
 
-  for (const match of content.matchAll(referenceLinkPattern)) {
+  for (const match of sanitizedContent.matchAll(referenceLinkPattern)) {
     const target = referenceDefinitions.get(normalizeReferenceLabel(match[2]));
     if (target) {
       addUniqueLink(links, target);
@@ -56,10 +63,17 @@ function extractMarkdownLinks(content: string): string[] {
 }
 
 function addUniqueLink(links: string[], target: string | undefined): void {
-  if (!target || links.includes(target)) {
+  if (!target) {
     return;
   }
-  links.push(target);
+  const cleanTarget = target.trim();
+  if (cleanTarget.length === 0 || links.includes(cleanTarget)) {
+    return;
+  }
+  if (/[[\]{}^$]/.test(cleanTarget)) {
+    return;
+  }
+  links.push(cleanTarget);
 }
 
 function normalizeReferenceLabel(label: string | undefined): string {
