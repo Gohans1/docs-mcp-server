@@ -65,6 +65,41 @@ export class WebScraperStrategy extends BaseScraperStrategy {
   private tempFiles: string[] = [];
   private siblingwiseRedirectWarned = false;
   private pendingLlmsTxtProbe: LlmsTxtProbeResult | null = null;
+  private readonly knownDirectories = new Set<string>();
+
+  private registerKnownDirectoryFromUrl(url: string): void {
+    try {
+      const parsed = new URL(url);
+      const lastSlash = parsed.pathname.lastIndexOf("/");
+      if (lastSlash > 0) {
+        parsed.search = "";
+        parsed.hash = "";
+        parsed.pathname = parsed.pathname.slice(0, lastSlash + 1);
+        this.knownDirectories.add(parsed.toString());
+      }
+    } catch {}
+  }
+
+  protected getLinkResolutionBaseUrl(
+    fetchedSource: string,
+    effectiveSource: string,
+  ): URL {
+    if (/\/index\.(html|htm|asp|php|jsp|md|markdown)$/i.test(fetchedSource)) {
+      const baseWithSlash = effectiveSource.endsWith("/")
+        ? effectiveSource
+        : `${effectiveSource}/`;
+      return new URL(baseWithSlash);
+    }
+
+    const dirCandidate = effectiveSource.endsWith("/")
+      ? effectiveSource
+      : `${effectiveSource}/`;
+    if (this.knownDirectories.has(dirCandidate)) {
+      return new URL(dirCandidate);
+    }
+
+    return new URL(effectiveSource);
+  }
 
   constructor(config: AppConfig, options: WebScraperStrategyOptions = {}) {
     super(config, { urlNormalizerOptions: options.urlNormalizerOptions });
@@ -394,6 +429,7 @@ export class WebScraperStrategy extends BaseScraperStrategy {
     for (const link of probe.result.links) {
       try {
         const targetUrl = new URL(link.url, probe.url);
+        this.registerKnownDirectoryFromUrl(targetUrl.href);
         if (targetUrl.protocol !== "http:" && targetUrl.protocol !== "https:") {
           continue;
         }
@@ -613,10 +649,13 @@ export class WebScraperStrategy extends BaseScraperStrategy {
         };
       }
 
+      const linkBaseUrl = this.getLinkResolutionBaseUrl(fetchedSource, effectiveSource);
+
       const filteredLinks =
         processed.links?.flatMap((link) => {
           try {
-            const targetUrl = new URL(link, effectiveSource);
+            const targetUrl = new URL(link, linkBaseUrl);
+            this.registerKnownDirectoryFromUrl(targetUrl.href);
 
             // Archives are readable but deliberately not followed mid-crawl.
             // This is policy, so it stays separate from the capability gate below.
@@ -675,6 +714,8 @@ export class WebScraperStrategy extends BaseScraperStrategy {
     progressCallback: ProgressCallback<ScraperProgressEvent>,
     signal?: AbortSignal,
   ): Promise<void> {
+    this.knownDirectories.clear();
+    this.registerKnownDirectoryFromUrl(options.url);
     this.pendingLlmsTxtProbe = null;
     this.pendingLlmsTxtProbe = await this.probeLlmsTxt(
       options.url,

@@ -1288,6 +1288,108 @@ describe("WebScraperStrategy", () => {
       expect(docUrls).toContain("https://example.com/docs/guide");
     });
 
+    it("should resolve relative links in directory markdown files against directory base with trailing slash", async () => {
+      const progressCallback = vi.fn<ProgressCallback<ScraperProgressEvent>>();
+      options.url = "https://example.com/";
+      options.maxDepth = 2;
+
+      mockFetchFn.mockImplementation(async (url: string) => {
+        if (String(url).endsWith("/llms.txt")) {
+          return {
+            content:
+              "# Project\n\n- [Guide](/guide.md)\n- [Features](/guide/features.md)",
+            mimeType: "text/plain",
+            source: url,
+            status: FetchStatus.SUCCESS,
+          };
+        }
+        if (url === "https://example.com/") {
+          return {
+            content: "<html><body>Home</body></html>",
+            mimeType: "text/html",
+            source: url,
+            status: FetchStatus.SUCCESS,
+          };
+        }
+        if (
+          url === "https://example.com/guide.md" ||
+          url === "https://example.com/guide"
+        ) {
+          return {
+            content:
+              "# Guide\n\n- [Features](./features)\n- [Setup](./setup)\n- [Config](../config/)",
+            mimeType: "text/markdown",
+            source: "https://example.com/guide.md",
+            status: FetchStatus.SUCCESS,
+          };
+        }
+        return {
+          content: "# Child\n\nChild content.",
+          mimeType: "text/markdown",
+          source: url,
+          status: FetchStatus.SUCCESS,
+        };
+      });
+
+      await strategy.scrape(options, progressCallback);
+
+      expect(mockFetchFn).toHaveBeenCalledWith(
+        "https://example.com/guide/setup",
+        expect.anything(),
+      );
+      expect(mockFetchFn).not.toHaveBeenCalledWith(
+        "https://example.com/setup",
+        expect.anything(),
+      );
+      expect(mockFetchFn).not.toHaveBeenCalledWith(
+        "https://example.com/features",
+        expect.anything(),
+      );
+    });
+
+    it("should resolve relative links in index.md against parent directory", async () => {
+      const progressCallback = vi.fn<ProgressCallback<ScraperProgressEvent>>();
+      const testUrl = "https://example.com/workers/runtime-apis/index.md";
+      options.url = testUrl;
+      options.maxDepth = 1;
+
+      mockFetchFn.mockImplementation(async (url: string) => {
+        if (String(url).endsWith("/llms.txt")) {
+          return {
+            content: "",
+            mimeType: "text/plain",
+            source: url,
+            status: FetchStatus.NOT_FOUND,
+          };
+        }
+        if (url === testUrl || url === "https://example.com/workers/runtime-apis") {
+          return {
+            content: "# Runtime APIs\n\n- [Request](./request)",
+            mimeType: "text/markdown",
+            source: testUrl,
+            status: FetchStatus.SUCCESS,
+          };
+        }
+        return {
+          content: "# Child\n\nChild content.",
+          mimeType: "text/markdown",
+          source: url,
+          status: FetchStatus.SUCCESS,
+        };
+      });
+
+      await strategy.scrape(options, progressCallback);
+
+      expect(mockFetchFn).toHaveBeenCalledWith(
+        "https://example.com/workers/runtime-apis/request",
+        expect.anything(),
+      );
+      expect(mockFetchFn).not.toHaveBeenCalledWith(
+        "https://example.com/workers/request",
+        expect.anything(),
+      );
+    });
+
     it("should continue using HTML link extraction for HTML content", async () => {
       const progressCallback = vi.fn<ProgressCallback<ScraperProgressEvent>>();
       const testUrl = "https://example.com/docs/";
