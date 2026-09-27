@@ -202,6 +202,18 @@ describe("MCP Server Read-Only Mode", () => {
     );
   });
 
+  it("should describe search_docs as fast full-text BM25 search without vector claims", () => {
+    const server = createMcpServerInstance(mockTools, mockConfig);
+    const searchDocsTool = (server as any)._registeredTools.search_docs;
+
+    expect(searchDocsTool.description).toContain(
+      "Fast full-text keyword search (BM25) across library documentation.",
+    );
+    expect(searchDocsTool.description).not.toContain("vector search");
+    expect(searchDocsTool.description).not.toContain("hybrid");
+    expect(searchDocsTool.description).toContain("NEVER use full sentences");
+  });
+
   it("should describe the supported list_pages default limit of 200", () => {
     const server = createMcpServerInstance(mockTools, mockConfig);
     const schema = (server as any)._registeredTools.list_pages.inputSchema;

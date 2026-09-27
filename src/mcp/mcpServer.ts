@@ -305,13 +305,12 @@ export function createMcpServerInstance(
   // Search docs tool
   server.tool(
     "search_docs",
-    "Search library documentation using hybrid full-text (BM25) and vector search.\n\n" +
-      "HOW TO SEARCH EFFECTIVELY:\n" +
-      "1. Exact Symbols Win (Highest Precision): Query exact API names, functions, hooks, types, or interfaces (e.g. 'useEffect', 'tabs.onUpdated', 'createSlice').\n" +
-      "2. Keep It Short: Use 1-3 targeted keywords only. Do NOT stack 5+ words or write full sentences.\n" +
-      "3. No Boolean Operators: Do NOT use 'or', 'and', 'how to' — search keywords directly.\n" +
-      "4. Next Step (Avoid Chunks): Results often return multiple partial chunks from the same URL. Do NOT piece them together — simply take the resulting URL and call `read_page` ONCE to read the entire page, full API contract, and code examples.\n" +
-      "5. Fallback: If unsure about available topics or search returns empty, call `list_pages` to browse the sitemap.",
+    "Fast full-text keyword search (BM25) across library documentation.\n\n" +
+      "RULES:\n" +
+      "- Exact symbols/keywords only (1-3 words, e.g. 'tabs.create', 'storage.local').\n" +
+      "- NEVER use full sentences, questions, or conversational prompts (no semantic search).\n" +
+      "- Take the top URL and call `read_page` to view the full page and code examples.\n" +
+      "- Call `list_pages` if search yields no results.",
     {
       library: z
         .string()
