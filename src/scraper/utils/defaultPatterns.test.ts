@@ -5,6 +5,7 @@ import {
   DEFAULT_FOLDER_EXCLUSIONS,
   DEFAULT_LOCALE_PATH_PATTERN,
   DEFAULT_LOCALE_QUERY_PATTERN,
+  DEFAULT_REPO_TEST_FOLDER_EXCLUSIONS,
   getEffectiveExclusionPatterns,
 } from "./defaultPatterns";
 
@@ -32,6 +33,25 @@ describe("defaultPatterns", () => {
       expect(DEFAULT_FOLDER_EXCLUSIONS).toContain("**/archive/**");
       expect(DEFAULT_FOLDER_EXCLUSIONS).toContain("**/deprecated/**");
       expect(DEFAULT_FOLDER_EXCLUSIONS).toContain("**/i18n/zh*/**");
+    });
+
+    it("should not contain coarse test or spec folder exclusions in universal web folder exclusions", () => {
+      expect(DEFAULT_FOLDER_EXCLUSIONS).not.toContain("**/test/**");
+      expect(DEFAULT_FOLDER_EXCLUSIONS).not.toContain("**/tests/**");
+      expect(DEFAULT_FOLDER_EXCLUSIONS).not.toContain("**/__tests__/**");
+      expect(DEFAULT_FOLDER_EXCLUSIONS).not.toContain("**/spec/**");
+    });
+  });
+
+  describe("DEFAULT_REPO_TEST_FOLDER_EXCLUSIONS", () => {
+    it("should define root and package anchored test folder patterns for repositories", () => {
+      expect(DEFAULT_REPO_TEST_FOLDER_EXCLUSIONS).toBeDefined();
+      expect(DEFAULT_REPO_TEST_FOLDER_EXCLUSIONS).toContain("test/**");
+      expect(DEFAULT_REPO_TEST_FOLDER_EXCLUSIONS).toContain("tests/**");
+      expect(DEFAULT_REPO_TEST_FOLDER_EXCLUSIONS).toContain("__tests__/**");
+      expect(DEFAULT_REPO_TEST_FOLDER_EXCLUSIONS).toContain("**/__tests__/**");
+      expect(DEFAULT_REPO_TEST_FOLDER_EXCLUSIONS).not.toContain("**/test/**");
+      expect(DEFAULT_REPO_TEST_FOLDER_EXCLUSIONS).not.toContain("**/spec/**");
     });
   });
 
@@ -134,6 +154,54 @@ describe("defaultPatterns", () => {
       expect(re.test("?lang=pl")).toBe(true);
       expect(re.test("?locale=pl")).toBe(true);
       expect(re.test("?lang=python")).toBe(false);
+    });
+
+    it("should omit repo test folder exclusions when startUrl is a web documentation site", () => {
+      const resultBun = getEffectiveExclusionPatterns(undefined, "https://bun.com/docs");
+      expect(resultBun).not.toContain("test/**");
+      expect(resultBun).not.toContain("tests/**");
+      expect(resultBun).not.toContain("**/test/**");
+      expect(resultBun).not.toContain("**/spec/**");
+      // Still preserves standard documentation folder exclusions
+      expect(resultBun).toContain("**/archive/**");
+      expect(resultBun).toContain("**/deprecated/**");
+      expect(resultBun).toContain("**/dist/**");
+
+      const resultChrome = getEffectiveExclusionPatterns(
+        undefined,
+        "https://developer.chrome.com/docs/extensions",
+      );
+      expect(resultChrome).not.toContain("test/**");
+      expect(resultChrome).not.toContain("tests/**");
+    });
+
+    it("should include repo test folder exclusions when startUrl is a GitHub repository", () => {
+      const resultGitHub = getEffectiveExclusionPatterns(
+        undefined,
+        "https://github.com/oven-sh/bun",
+      );
+      expect(resultGitHub).toContain("test/**");
+      expect(resultGitHub).toContain("tests/**");
+      expect(resultGitHub).toContain("__tests__/**");
+      expect(resultGitHub).toContain("**/__tests__/**");
+      // Does not contain unanchored **/test/** to avoid dropping docs/test
+      expect(resultGitHub).not.toContain("**/test/**");
+      expect(resultGitHub).not.toContain("**/spec/**");
+    });
+
+    it("should include repo test folder exclusions when startUrl is a local file repository", () => {
+      const resultLocal = getEffectiveExclusionPatterns(
+        undefined,
+        "file:///Users/dev/my-project",
+      );
+      expect(resultLocal).toContain("test/**");
+      expect(resultLocal).toContain("tests/**");
+      expect(resultLocal).toContain("__tests__/**");
+
+      // When startUrl is unspecified, it returns universal default exclusions without repo-specific folders
+      const resultNoUrl = getEffectiveExclusionPatterns(undefined);
+      expect(resultNoUrl).toEqual(DEFAULT_EXCLUSION_PATTERNS);
+      expect(resultNoUrl).not.toContain("test/**");
     });
   });
 });

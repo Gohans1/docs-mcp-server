@@ -243,6 +243,120 @@ describe("patternMatcher", () => {
       // If a documentation site has only 1 language without language query params, it is not blocked
       expect(shouldIncludeUrl("https://docs.example.vn/cai-dat")).toBe(true);
     });
+
+    it("should include test runner documentation and specifications on web documentation sites", () => {
+      const bunStartUrl = "https://bun.com/docs";
+      // Bun test runner subpages must be included
+      expect(
+        shouldIncludeUrl(
+          "https://bun.com/docs/test/writing-tests",
+          undefined,
+          undefined,
+          bunStartUrl,
+        ),
+      ).toBe(true);
+      expect(
+        shouldIncludeUrl(
+          "https://bun.com/docs/test/mocks",
+          undefined,
+          undefined,
+          bunStartUrl,
+        ),
+      ).toBe(true);
+      expect(
+        shouldIncludeUrl(
+          "https://bun.com/docs/test/snapshots",
+          undefined,
+          undefined,
+          bunStartUrl,
+        ),
+      ).toBe(true);
+      expect(
+        shouldIncludeUrl(
+          "https://bun.com/docs/test/configuration",
+          undefined,
+          undefined,
+          bunStartUrl,
+        ),
+      ).toBe(true);
+
+      // Web specifications must not be blocked by spec
+      expect(
+        shouldIncludeUrl(
+          "https://html.spec.whatwg.org/multipage/",
+          undefined,
+          undefined,
+          "https://html.spec.whatwg.org/",
+        ),
+      ).toBe(true);
+      expect(
+        shouldIncludeUrl(
+          "https://spec.openapis.org/oas/v3.1.0",
+          undefined,
+          undefined,
+          "https://spec.openapis.org/",
+        ),
+      ).toBe(true);
+      expect(
+        shouldIncludeUrl(
+          "https://tc39.es/ecma262/spec/",
+          undefined,
+          undefined,
+          "https://tc39.es/",
+        ),
+      ).toBe(true);
+
+      // Preserves locale and archive exclusions even within test docs
+      expect(
+        shouldIncludeUrl(
+          "https://bun.com/docs/test/writing-tests?hl=vi",
+          undefined,
+          undefined,
+          bunStartUrl,
+        ),
+      ).toBe(false);
+      expect(
+        shouldIncludeUrl(
+          "https://bun.com/docs/archive/v1/test",
+          undefined,
+          undefined,
+          bunStartUrl,
+        ),
+      ).toBe(false);
+      // Preserves test code file exclusions
+      expect(
+        shouldIncludeUrl(
+          "https://bun.com/docs/examples/app.test.ts",
+          undefined,
+          undefined,
+          bunStartUrl,
+        ),
+      ).toBe(false);
+    });
+
+    it("should exclude root test directories while including docs/test in repository scrapes", () => {
+      const githubUrl = "https://github.com/oven-sh/bun";
+      // Test fixtures and root test directory in GitHub repo must be excluded
+      expect(
+        shouldIncludeUrl("tests/fixtures/mock.json", undefined, undefined, githubUrl),
+      ).toBe(false);
+      expect(shouldIncludeUrl("test/helpers.ts", undefined, undefined, githubUrl)).toBe(
+        false,
+      );
+      expect(
+        shouldIncludeUrl(
+          "src/components/__tests__/mock.ts",
+          undefined,
+          undefined,
+          githubUrl,
+        ),
+      ).toBe(false);
+
+      // But markdown docs under docs/ in a GitHub repo must be included
+      expect(
+        shouldIncludeUrl("docs/test/runner.md", undefined, undefined, githubUrl),
+      ).toBe(true);
+    });
   });
 
   describe("shouldIncludeUrl with default patterns", () => {

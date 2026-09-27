@@ -29,6 +29,7 @@ export const DEFAULT_FILE_EXCLUSIONS = [
   "**/*.spec.*",
   "**/*_test.py",
   "**/*_test.go",
+  "**/*_spec.rb",
 
   // Package manager lock files
   "**/*.lock",
@@ -54,6 +55,23 @@ export const DEFAULT_FILE_EXCLUSIONS = [
 ];
 
 /**
+ * Repository test folder exclusion patterns - used when crawling source code repositories
+ * (e.g. GitHub repos, local projects). Root-anchored and monorepo package anchored to prevent
+ * indexing test fixtures, helpers, and mocks, while preserving valid documentation paths
+ * (such as docs/test/... or docs/spec/...).
+ */
+export const DEFAULT_REPO_TEST_FOLDER_EXCLUSIONS = [
+  "test/**",
+  "tests/**",
+  "__tests__/**",
+  "**/__tests__/**",
+  "packages/*/test/**",
+  "packages/*/tests/**",
+  "packages/*/spec/**",
+  "src/**/__tests__/**",
+];
+
+/**
  * Default folder/path exclusion patterns - directories commonly found in documentation that should be excluded.
  */
 export const DEFAULT_FOLDER_EXCLUSIONS = [
@@ -69,12 +87,6 @@ export const DEFAULT_FOLDER_EXCLUSIONS = [
 
   // Specific paths that don't follow the general pattern
   "docs/old/**",
-
-  // Test directories
-  "**/test/**",
-  "**/tests/**",
-  "**/__tests__/**",
-  "**/spec/**",
 
   // Build output directories
   "**/dist/**",
@@ -203,6 +215,38 @@ function unblockLocaleFolderExclusions(
 }
 
 /**
+ * Determines whether a start URL targets a code repository (e.g. GitHub repo, local directory)
+ * rather than a web documentation website.
+ */
+export function isRepositoryTarget(startUrl?: string): boolean {
+  if (!startUrl) return false;
+  if (startUrl.startsWith("file://") || startUrl.startsWith("github-file://")) {
+    return true;
+  }
+  try {
+    const parsed = new URL(startUrl);
+    const hostname = parsed.hostname.toLowerCase();
+    if (
+      (hostname === "github.com" || hostname === "www.github.com") &&
+      !parsed.pathname.includes("/wiki")
+    ) {
+      return true;
+    }
+    return false;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Determines whether a start URL targets a web documentation site as opposed to a code repository.
+ */
+export function isWebDocTarget(startUrl?: string): boolean {
+  if (!startUrl) return true;
+  return !isRepositoryTarget(startUrl);
+}
+
+/**
  * Get effective exclusion patterns by merging defaults with user patterns.
  * Default exclusion patterns are always preserved and merged with any user patterns.
  *
@@ -214,6 +258,13 @@ export function getEffectiveExclusionPatterns(
   startUrl?: string,
 ): string[] {
   let defaults = DEFAULT_EXCLUSION_PATTERNS;
+
+  // Code repositories (GitHub repos, local codebases) exclude root and package-level test folders
+  // to prevent indexing unit test fixtures, helpers, and mocks. Web documentation sites omit these
+  // so test runner documentation and specifications are fully indexed.
+  if (isRepositoryTarget(startUrl)) {
+    defaults = [...defaults, ...DEFAULT_REPO_TEST_FOLDER_EXCLUSIONS];
+  }
 
   if (startUrl) {
     try {
