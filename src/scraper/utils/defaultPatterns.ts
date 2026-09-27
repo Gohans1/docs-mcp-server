@@ -113,7 +113,61 @@ export const DEFAULT_FOLDER_EXCLUSIONS = [
   "**/zh-mo/**",
   "**/zh-sg/**",
   "**/zh-tw/**",
+
+  // Query parameter language switcher patterns (e.g. ?hl=vi, ?lang=ja, ?locale=fr)
+  // Auto-excludes non-English human locales while allowing English (en, en-US, en_GB, english)
+  // and strictly avoiding programming language selection parameters (python, javascript, typescript, rust, etc.).
+  // Handles URL hash fragments (#) safely to avoid false positives on English anchor URLs.
+  "/[?&](hl=(?!(?:en([-_][a-zA-Z0-9]+)?|english)(?:[#&]|$))[^&#]+|(?:locale|lang|language)=(?!(?:en([-_][a-zA-Z0-9]+)?|english)(?:[#&]|$))(?:[a-z]{2,3}[-_][a-zA-Z0-9]+|ar|bn|de|es|fa|fr|he|hi|it|ja|ko|nl|pl|pt|ru|th|tr|vi|zh)(?:[#&]|$))/i",
+
+  // Path-based non-English documentation locales anchored to root or docs prefixes
+  // (e.g. /de/..., /docs/fr/..., /ja/...). Does NOT match bare 'id' to avoid dropping Element.id / REST API IDs.
+  "/^\\/(?:(?:docs|documentation|manual|guide|intl|i18n|v[0-9]+)\\/)?(ar|bn|de|es|fa|fr|he|hi|it|ja|ko|nl|pl|pt|pt-br|pt-pt|ru|th|tr|vi|zh|zh-cn|zh-tw|es-419|id-id|id_id)(\\/|\\?|$)/i",
 ];
+
+/**
+ * Curated list of non-English path locale identifiers.
+ */
+export const NON_ENGLISH_PATH_LOCALES = [
+  "ar",
+  "bn",
+  "de",
+  "es",
+  "fa",
+  "fr",
+  "he",
+  "hi",
+  "it",
+  "ja",
+  "ko",
+  "nl",
+  "pl",
+  "pt",
+  "pt-br",
+  "pt-pt",
+  "ru",
+  "th",
+  "tr",
+  "vi",
+  "zh",
+  "zh-cn",
+  "zh-tw",
+  "es-419",
+  "id-id",
+  "id_id",
+];
+
+/**
+ * Default query pattern for non-English locales.
+ */
+export const DEFAULT_LOCALE_QUERY_PATTERN =
+  "/[?&](hl=(?!(?:en([-_][a-zA-Z0-9]+)?|english)(?:[#&]|$))[^&#]+|(?:locale|lang|language)=(?!(?:en([-_][a-zA-Z0-9]+)?|english)(?:[#&]|$))(?:[a-z]{2,3}[-_][a-zA-Z0-9]+|ar|bn|de|es|fa|fr|he|hi|it|ja|ko|nl|pl|pt|ru|th|tr|vi|zh)(?:[#&]|$))/i";
+
+/**
+ * Default path pattern for non-English locales.
+ */
+export const DEFAULT_LOCALE_PATH_PATTERN =
+  "/^\\/(?:(?:docs|documentation|manual|guide|intl|i18n|v[0-9]+)\\/)?(ar|bn|de|es|fa|fr|he|hi|it|ja|ko|nl|pl|pt|pt-br|pt-pt|ru|th|tr|vi|zh|zh-cn|zh-tw|es-419|id-id|id_id)(\\/|\\?|$)/i";
 
 /**
  * Combined default exclusion patterns (files + folders).
@@ -125,16 +179,84 @@ export const DEFAULT_EXCLUSION_PATTERNS = [
 ];
 
 /**
- * Get effective exclusion patterns by merging defaults with user patterns.
- * If user provides patterns, use only theirs (allowing override).
- * If user provides no patterns, use defaults.
+ * Unblock locale folder exclusions when a specific locale is explicitly requested.
  */
-export function getEffectiveExclusionPatterns(userPatterns?: string[]): string[] {
-  // If user explicitly provides patterns (even empty array), respect their choice
-  if (userPatterns !== undefined) {
-    return userPatterns;
+function unblockLocaleFolderExclusions(
+  patterns: string[],
+  allowedLocale: string,
+): string[] {
+  const norm = allowedLocale.toLowerCase().replace(/_/g, "-");
+  const base = norm.split(/[-_]/)[0];
+  return patterns.filter((pattern) => {
+    if (pattern.startsWith("**/") && pattern.endsWith("/**")) {
+      const folder = pattern.slice(3, -3).toLowerCase();
+      // Match exact locale folder e.g. "zh-cn"
+      if (folder === norm) return false;
+      // Match i18n prefixes e.g. "i18n/ja*" matching "ja", or "i18n/zh*" matching "zh-cn"
+      if (folder.startsWith("i18n/")) {
+        const prefix = folder.slice(5).replace(/\*$/, "");
+        if (norm.startsWith(prefix) || base === prefix) return false;
+      }
+    }
+    return true;
+  });
+}
+
+/**
+ * Get effective exclusion patterns by merging defaults with user patterns.
+ * Default exclusion patterns are always preserved and merged with any user patterns.
+ *
+ * If startUrl specifies a non-English language (e.g. ?hl=ja or /ja/), that language
+ * is permitted as the requested documentation language and not excluded.
+ */
+export function getEffectiveExclusionPatterns(
+  userPatterns?: string[],
+  startUrl?: string,
+): string[] {
+  let defaults = DEFAULT_EXCLUSION_PATTERNS;
+
+  if (startUrl) {
+    try {
+      const parsedStart = new URL(startUrl);
+
+      // 1. Check if startUrl explicitly requests a non-English language via query param
+      const startLang =
+        parsedStart.searchParams.get("hl") ||
+        parsedStart.searchParams.get("lang") ||
+        parsedStart.searchParams.get("locale") ||
+        parsedStart.searchParams.get("language");
+      if (startLang && !/^(?:en([-_][a-zA-Z0-9]+)?|english)$/i.test(startLang)) {
+        const escapedLang = startLang.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        const customLangRegex = `/[?&](hl=(?!(?:en([-_][a-zA-Z0-9]+)?|english|${escapedLang})(?:[#&]|$))[^&#]+|(?:locale|lang|language)=(?!(?:en([-_][a-zA-Z0-9]+)?|english|${escapedLang})(?:[#&]|$))(?:[a-z]{2,3}[-_][a-zA-Z0-9]+|ar|bn|de|es|fa|fr|he|hi|it|ja|ko|nl|pl|pt|ru|th|tr|vi|zh)(?:[#&]|$))/i`;
+        defaults = defaults.map((p) =>
+          p === DEFAULT_LOCALE_QUERY_PATTERN ? customLangRegex : p,
+        );
+        defaults = unblockLocaleFolderExclusions(defaults, startLang);
+      }
+
+      // 2. Check if startUrl path has an explicit non-English locale segment
+      const pathSegments = parsedStart.pathname.toLowerCase().split("/").filter(Boolean);
+      const matchedPathLocale = pathSegments.find((seg) =>
+        NON_ENGLISH_PATH_LOCALES.includes(seg),
+      );
+      if (matchedPathLocale) {
+        const locales = NON_ENGLISH_PATH_LOCALES.filter(
+          (l) => l.toLowerCase() !== matchedPathLocale.toLowerCase(),
+        );
+        const customPathRegex = `/^\\/(?:(?:docs|documentation|manual|guide|intl|i18n|v[0-9]+)\\/)?(${locales.join("|")})(\\/|\\?|$)/i`;
+        defaults = defaults.map((p) =>
+          p === DEFAULT_LOCALE_PATH_PATTERN ? customPathRegex : p,
+        );
+        defaults = unblockLocaleFolderExclusions(defaults, matchedPathLocale);
+      }
+    } catch {}
   }
 
-  // Otherwise, use default patterns
-  return DEFAULT_EXCLUSION_PATTERNS;
+  if (!userPatterns || userPatterns.length === 0) {
+    return defaults;
+  }
+
+  // Merge defaults with user patterns, eliminating duplicates
+  const merged = new Set([...defaults, ...userPatterns]);
+  return Array.from(merged);
 }

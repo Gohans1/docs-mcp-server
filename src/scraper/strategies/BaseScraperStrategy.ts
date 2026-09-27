@@ -233,7 +233,12 @@ export abstract class BaseScraperStrategy implements ScraperStrategy {
         return false;
       }
     }
-    return shouldIncludeUrl(url, options.includePatterns, options.excludePatterns);
+    return shouldIncludeUrl(
+      url,
+      options.includePatterns,
+      options.excludePatterns,
+      this.canonicalBaseUrl?.href || options.url,
+    );
   }
 
   /**

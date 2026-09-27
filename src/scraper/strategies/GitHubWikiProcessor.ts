@@ -74,6 +74,7 @@ export class GitHubWikiProcessor {
         wikiPagePath || "Home",
         options.includePatterns,
         options.excludePatterns,
+        options.url,
       );
     } catch {
       return false;

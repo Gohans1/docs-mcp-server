@@ -507,14 +507,24 @@ export class GitHubScraperStrategy extends BaseScraperStrategy {
       hasCompoundExtension ||
       isCommonTextFile
     ) {
-      return shouldIncludeUrl(filePath, options.includePatterns, options.excludePatterns);
+      return shouldIncludeUrl(
+        filePath,
+        options.includePatterns,
+        options.excludePatterns,
+        options.url,
+      );
     }
 
     // Fallback: check if unknown extension has text/* MIME type using MimeTypeUtils
     const mimeType = MimeTypeUtils.detectMimeTypeFromPath(filePath);
     if (mimeType?.startsWith("text/")) {
       logger.debug(`Including file with text MIME type: ${filePath} (${mimeType})`);
-      return shouldIncludeUrl(filePath, options.includePatterns, options.excludePatterns);
+      return shouldIncludeUrl(
+        filePath,
+        options.includePatterns,
+        options.excludePatterns,
+        options.url,
+      );
     }
 
     // Not a text file

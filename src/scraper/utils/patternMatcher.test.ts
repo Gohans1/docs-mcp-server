@@ -45,12 +45,203 @@ describe("patternMatcher", () => {
       expect(shouldIncludeUrl("https://x.com/foo", undefined, ["foo*"])).toBe(false);
     });
 
-    it("should respect user's choice to have no exclusions", () => {
-      // When user explicitly provides empty array, no defaults should be applied
+    it("should preserve default exclusions when user provides empty array", () => {
+      // User passing empty array still preserves defaults
       expect(shouldIncludeUrl("https://example.com/CHANGELOG.md", undefined, [])).toBe(
+        false,
+      );
+      expect(shouldIncludeUrl("https://example.com/LICENSE", undefined, [])).toBe(false);
+      expect(shouldIncludeUrl("https://example.com/docs/guide", undefined, [])).toBe(
         true,
       );
-      expect(shouldIncludeUrl("https://example.com/LICENSE", undefined, [])).toBe(true);
+    });
+
+    it("should support regex patterns with flags and not mistake multi-segment globs for regex", () => {
+      expect(isRegexPattern("/foo/i")).toBe(true);
+      expect(patternToRegExp("/foo/i").test("FOO")).toBe(true);
+      expect(patternToRegExp("/foo/").test("FOO")).toBe(false);
+
+      // Multi-segment path globs with unescaped slashes must NOT be treated as regex literals
+      expect(isRegexPattern("/api/v1/users/d")).toBe(false);
+      expect(isRegexPattern("/docs/guide/i")).toBe(false);
+      expect(isRegexPattern("/docs/**/")).toBe(false);
+
+      // Regex with escaped slashes IS a valid regex
+      expect(isRegexPattern("/^\\/docs\\/guide/i")).toBe(true);
+    });
+
+    it("should ensure regex caching is idempotent and does not suffer from lastIndex state mutation", () => {
+      const re = patternToRegExp("/foo/i");
+      expect(re.test("foo")).toBe(true);
+      expect(re.test("foo")).toBe(true);
+      expect(matchesAnyPattern("/foo/bar", ["/foo/i"])).toBe(true);
+      expect(matchesAnyPattern("/foo/baz", ["/foo/i"])).toBe(true);
+      expect(matchesAnyHostPattern("foo.example.com", ["/foo/i"])).toBe(true);
+      expect(matchesAnyHostPattern("foo.example.com", ["/foo/i"])).toBe(true);
+    });
+
+    it("should exclude path-based non-English locales even with query parameters", () => {
+      expect(shouldIncludeUrl("https://developer.chrome.com/docs/ja?page=2")).toBe(false);
+      expect(shouldIncludeUrl("https://developer.chrome.com/de?v=1")).toBe(false);
+      expect(shouldIncludeUrl("https://developer.chrome.com/docs/en?page=2")).toBe(true);
+    });
+
+    it("should not exclude English URLs containing hash fragments", () => {
+      expect(
+        shouldIncludeUrl("https://developer.chrome.com/docs/extensions?hl=en#manifest"),
+      ).toBe(true);
+      expect(
+        shouldIncludeUrl(
+          "https://developer.chrome.com/docs/extensions?hl=en-US#overview",
+        ),
+      ).toBe(true);
+      expect(shouldIncludeUrl("https://example.com/docs/guide?lang=en#setup")).toBe(true);
+      expect(
+        shouldIncludeUrl("https://developer.chrome.com/docs/extensions?hl=ja#manifest"),
+      ).toBe(false);
+    });
+
+    it("should include single-language documentation in locale folders when startUrl specifies it", () => {
+      const startUrl = "https://example.com/zh-cn/docs";
+      expect(
+        shouldIncludeUrl(
+          "https://example.com/zh-cn/docs/guide",
+          undefined,
+          undefined,
+          startUrl,
+        ),
+      ).toBe(true);
+      // Other locales must still be excluded
+      expect(
+        shouldIncludeUrl(
+          "https://example.com/zh-tw/docs/guide",
+          undefined,
+          undefined,
+          startUrl,
+        ),
+      ).toBe(false);
+      expect(
+        shouldIncludeUrl(
+          "https://example.com/ja/docs/guide",
+          undefined,
+          undefined,
+          startUrl,
+        ),
+      ).toBe(false);
+    });
+
+    it("should exclude non-English query parameter variants by default", () => {
+      // Non-English hl query parameters (Google DevSite style)
+      expect(shouldIncludeUrl("https://developer.chrome.com/docs/extensions?hl=vi")).toBe(
+        false,
+      );
+      expect(
+        shouldIncludeUrl("https://developer.chrome.com/docs/extensions?hl=zh-cn"),
+      ).toBe(false);
+      expect(shouldIncludeUrl("https://developer.chrome.com/docs/extensions?hl=ar")).toBe(
+        false,
+      );
+      expect(shouldIncludeUrl("https://developer.chrome.com/docs/extensions?hl=ru")).toBe(
+        false,
+      );
+      expect(
+        shouldIncludeUrl("https://developer.chrome.com/docs/extensions?param=1&hl=es"),
+      ).toBe(false);
+
+      // Other non-English query parameters
+      expect(shouldIncludeUrl("https://example.com/guide?lang=ja")).toBe(false);
+      expect(shouldIncludeUrl("https://example.com/guide?locale=fr")).toBe(false);
+      expect(shouldIncludeUrl("https://example.com/guide?language=de")).toBe(false);
+
+      // English query parameters or regular parameters must be included
+      expect(shouldIncludeUrl("https://developer.chrome.com/docs/extensions?hl=en")).toBe(
+        true,
+      );
+      expect(
+        shouldIncludeUrl("https://developer.chrome.com/docs/extensions?hl=en-US"),
+      ).toBe(true);
+      expect(shouldIncludeUrl("https://example.com/guide?lang=en")).toBe(true);
+      expect(shouldIncludeUrl("https://example.com/guide?lang=en_US")).toBe(true);
+      expect(shouldIncludeUrl("https://example.com/guide?lang=english")).toBe(true);
+      expect(shouldIncludeUrl("https://developer.chrome.com/docs/extensions")).toBe(true);
+      expect(shouldIncludeUrl("https://example.com/api?version=1.0")).toBe(true);
+
+      // Programming language selection parameters must NEVER be blocked
+      expect(shouldIncludeUrl("https://example.com/docs/api?lang=python")).toBe(true);
+      expect(shouldIncludeUrl("https://example.com/docs/api?lang=javascript")).toBe(true);
+      expect(shouldIncludeUrl("https://example.com/docs/api?lang=rust")).toBe(true);
+      expect(shouldIncludeUrl("https://example.com/docs/api?language=typescript")).toBe(
+        true,
+      );
+      expect(shouldIncludeUrl("https://example.com/docs/api?language=python")).toBe(true);
+    });
+
+    it("should never block DOM attributes, REST API IDs, or technical paths containing 'id'", () => {
+      // MDN DOM attribute documentation
+      expect(
+        shouldIncludeUrl("https://developer.mozilla.org/en-US/docs/Web/API/Element/id"),
+      ).toBe(true);
+      expect(
+        shouldIncludeUrl(
+          "https://developer.mozilla.org/en-US/docs/Web/HTML/Global_attributes/id",
+        ),
+      ).toBe(true);
+      expect(
+        shouldIncludeUrl(
+          "https://developer.mozilla.org/en-US/docs/Web/API/HTMLInputElement/id",
+        ),
+      ).toBe(true);
+
+      // REST API endpoints with ID parameter or subresource
+      expect(shouldIncludeUrl("https://example.com/api/users/id")).toBe(true);
+      expect(shouldIncludeUrl("https://example.com/api/users/id/posts")).toBe(true);
+      expect(shouldIncludeUrl("https://example.com/docs/item/id/details")).toBe(true);
+      expect(shouldIncludeUrl("https://example.com/api/v1/projects/id")).toBe(true);
+
+      // Technical paths and abbreviations (ARKit, Elasticsearch)
+      expect(
+        shouldIncludeUrl("https://developer.apple.com/documentation/arkit/ar/intro"),
+      ).toBe(true);
+      expect(shouldIncludeUrl("https://example.com/docs/elasticsearch")).toBe(true);
+    });
+
+    it("should safely handle glob patterns with slashes and invalid flags without throwing SyntaxError", () => {
+      // Directory glob with slashes must not crash regex constructor
+      expect(() => patternToRegExp("/docs/**/")).not.toThrow();
+      expect(patternToRegExp("/docs/**/").test("/docs/guide/")).toBe(true);
+
+      // Pattern looking like flags must not crash
+      expect(() => patternToRegExp("/something/test")).not.toThrow();
+    });
+
+    it("should preserve regex patterns in stripSlash for file:// URLs", () => {
+      expect(shouldIncludeUrl("file:///path/to/test.md")).toBe(true);
+      expect(shouldIncludeUrl("file:///path/to/Element/id/index.html")).toBe(true);
+    });
+
+    it("should handle single non-English documentation without blocking itself", () => {
+      // If startUrl explicitly targets Japanese, don't block that Japanese target
+      const jpStartUrl = "https://example.jp/docs?hl=ja";
+      expect(
+        shouldIncludeUrl(
+          "https://example.jp/docs/api?hl=ja",
+          undefined,
+          undefined,
+          jpStartUrl,
+        ),
+      ).toBe(true);
+      // But still block other non-target languages
+      expect(
+        shouldIncludeUrl(
+          "https://example.jp/docs/api?hl=vi",
+          undefined,
+          undefined,
+          jpStartUrl,
+        ),
+      ).toBe(false);
+
+      // If a documentation site has only 1 language without language query params, it is not blocked
+      expect(shouldIncludeUrl("https://docs.example.vn/cai-dat")).toBe(true);
     });
   });
 
