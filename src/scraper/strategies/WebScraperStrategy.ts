@@ -389,6 +389,7 @@ export class WebScraperStrategy extends BaseScraperStrategy {
     probe: LlmsTxtProbeResult,
   ): QueueItem[] {
     const items: QueueItem[] = [];
+    let excludedCount = 0;
 
     for (const link of probe.result.links) {
       try {
@@ -406,6 +407,10 @@ export class WebScraperStrategy extends BaseScraperStrategy {
           continue;
         }
         if (!this.shouldProcessUrl(targetUrl.href, options)) {
+          excludedCount++;
+          logger.debug(
+            `llms.txt URL excluded by scope or pattern: ${targetUrl.href} (scope: ${options.scope ?? "subpages"}, base: ${options.url})`,
+          );
           continue;
         }
         if (this.shouldFollowLinkFn) {
@@ -416,6 +421,12 @@ export class WebScraperStrategy extends BaseScraperStrategy {
         }
         items.push({ url: targetUrl.href, depth: 0, fromLlmsTxt: true });
       } catch {}
+    }
+
+    if (excludedCount > 0) {
+      logger.warn(
+        `⚠️  llms.txt at ${probe.url} contained ${probe.result.links.length} URLs, but ${excludedCount} URLs were excluded by scope "${options.scope ?? "subpages"}" (base: ${options.url}).`,
+      );
     }
 
     return items;

@@ -153,12 +153,21 @@ describe("URL normalization", () => {
       expect(normalizeUrl("https://example.com/path/index.jsp")).toBe(
         "https://example.com/path",
       );
+      expect(normalizeUrl("https://example.com/path/index.md")).toBe(
+        "https://example.com/path",
+      );
+      expect(normalizeUrl("https://example.com/path/index.markdown")).toBe(
+        "https://example.com/path",
+      );
     });
 
     it("should preserve index files when removeIndex is false", () => {
       const opts = { removeIndex: false };
       expect(normalizeUrl("https://example.com/path/index.html", opts)).toBe(
         "https://example.com/path/index.html",
+      );
+      expect(normalizeUrl("https://example.com/path/index.md", opts)).toBe(
+        "https://example.com/path/index.md",
       );
     });
 
@@ -264,6 +273,11 @@ describe("stripMarkdownExtension", () => {
     expect(stripMarkdownExtension("https://vite.dev/guide/ssr.md")).toBe(
       "https://vite.dev/guide/ssr",
     );
+    expect(
+      stripMarkdownExtension(
+        "https://developers.cloudflare.com/workers/runtime-apis/index.md",
+      ),
+    ).toBe("https://developers.cloudflare.com/workers/runtime-apis");
   });
 
   it("recognises the markdown extensions the shared detector knows", () => {

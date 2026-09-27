@@ -43,7 +43,7 @@ export function normalizeUrl(
     // Remove index files first, before handling trailing slashes
     if (finalOptions.removeIndex && !pathIsPartOfRoute) {
       normalized.pathname = normalized.pathname.replace(
-        /\/index\.(html|htm|asp|php|jsp)$/i,
+        /\/index\.(html|htm|asp|php|jsp|md|markdown)$/i,
         "/",
       );
     }
@@ -156,7 +156,10 @@ export function stripMarkdownExtension(url: string): string {
 
   // A leading dot is not an extension separator, so `/.md` is left alone — it
   // names no page to fold onto.
-  const stripped = parsed.pathname.replace(/([^/])\.[^/.]*$/, "$1");
+  let stripped = parsed.pathname.replace(/([^/])\.[^/.]*$/, "$1");
+  if (stripped.endsWith("/index")) {
+    stripped = stripped.replace(/\/index$/, "") || "/";
+  }
   if (stripped === parsed.pathname) return url;
 
   parsed.pathname = stripped;
