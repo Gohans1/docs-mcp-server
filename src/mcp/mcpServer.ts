@@ -369,8 +369,9 @@ ${r.content}\n`,
         );
 
         if (formattedResults.length === 0) {
+          const target = version ? `${library}@${version}` : library;
           return createResponse(
-            `No results found for '${query}' in ${library}. Try to use a different or more general query.`,
+            `No results found for '${query}' in ${target}. Try broader keywords, or call list_pages to inspect available pages and read_page to read them.`,
           );
         }
         return createResponse(formattedResults.join(""));

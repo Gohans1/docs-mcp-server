@@ -214,6 +214,33 @@ describe("MCP Server Read-Only Mode", () => {
     expect(searchDocsTool.description).toContain("NEVER use full sentences");
   });
 
+  it("should advise using list_pages and read_page when search_docs yields no results", async () => {
+    (mockTools.search.execute as any).mockResolvedValueOnce({ results: [] });
+    const server = createMcpServerInstance(mockTools, mockConfig);
+    const searchDocsTool = (server as any)._registeredTools.search_docs;
+
+    const response = await searchDocsTool.handler({
+      library: "react",
+      query: "nonexistent",
+    });
+
+    expect(response.content[0].text).toContain(
+      "No results found for 'nonexistent' in react",
+    );
+    expect(response.content[0].text).toContain("list_pages");
+    expect(response.content[0].text).toContain("read_page");
+
+    (mockTools.search.execute as any).mockResolvedValueOnce({ results: [] });
+    const responseWithVersion = await searchDocsTool.handler({
+      library: "react",
+      version: "19.0.0",
+      query: "nonexistent",
+    });
+    expect(responseWithVersion.content[0].text).toContain(
+      "No results found for 'nonexistent' in react@19.0.0",
+    );
+  });
+
   it("should describe the supported list_pages default limit of 200", () => {
     const server = createMcpServerInstance(mockTools, mockConfig);
     const schema = (server as any)._registeredTools.list_pages.inputSchema;
